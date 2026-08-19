@@ -28,7 +28,6 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="video" href="v1.mp4" type="video/mp4">
   <link rel="preload" as="image" href="closed.png">
   <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=DM+Sans:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=block" rel="stylesheet">
   <style>
@@ -264,15 +263,16 @@
       position: relative;
       width: var(--video-width);
       line-height: 0;
-      background: var(--warm-white);
+      background: transparent;
     }
 
     .envelope-poster,
-    .envelope-video {
+    .envelope-video,
+    .envelope-canvas {
       display: block;
       width: 100%;
       height: auto;
-      background: var(--warm-white);
+      background: transparent;
       user-select: none;
       -webkit-user-drag: none;
     }
@@ -282,6 +282,12 @@
       z-index: 2;
       mix-blend-mode: screen;
       transition: opacity 0.35s var(--ease);
+    }
+
+    .envelope-canvas {
+      display: none;
+      position: relative;
+      z-index: 3;
     }
 
     .envelope-video {
@@ -303,6 +309,26 @@
       -webkit-appearance: none;
     }
 
+    .envelope:not(.use-canvas).is-opening .envelope-video,
+    .envelope:not(.use-canvas).is-open .envelope-video {
+      position: relative;
+      opacity: 1;
+    }
+
+    .envelope.use-canvas.is-opening .envelope-canvas,
+    .envelope.use-canvas.is-open .envelope-canvas {
+      display: block;
+    }
+
+    .envelope.use-canvas.is-opening .envelope-video,
+    .envelope.use-canvas.is-open .envelope-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.01;
+    }
+
     .envelope.is-opening .envelope-poster,
     .envelope.is-open .envelope-poster {
       position: absolute;
@@ -313,11 +339,6 @@
       pointer-events: none;
     }
 
-    .envelope.is-opening .envelope-video,
-    .envelope.is-open .envelope-video {
-      position: relative;
-      opacity: 1;
-    }
 
     .envelope.is-open:not(.is-opening) .envelope-video {
       pointer-events: none;
@@ -601,6 +622,7 @@
           <div class="envelope-float" id="envelopeFloat">
             <div class="envelope-media" id="envelopeMedia">
               <img class="envelope-poster" src="closed.png" alt="ظرف مغلق" width="568" height="439" draggable="false" decoding="sync" fetchpriority="high">
+              <canvas id="envelopeCanvas" class="envelope-canvas" aria-hidden="true"></canvas>
               <video
                 id="envelopeVideo"
                 class="envelope-video"
@@ -612,9 +634,7 @@
                 disablepictureinpicture
                 disableremoteplayback
                 aria-label="ظرف الدعوة"
-              >
-                <source src="v1.mp4" type="video/mp4">
-              </video>
+              ></video>
             </div>
           </div>
         </div>
@@ -686,6 +706,22 @@
       const body = document.body;
       const poster = document.querySelector('.envelope-poster');
       const video = document.getElementById('envelopeVideo');
+      const ua = navigator.userAgent || '';
+      const isiOS = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isSafari = /Safari/i.test(ua) && !/Chrome|CriOS|FxiOS|Android|Edg/i.test(ua);
+
+      function pickEnvelopeSrc() {
+        if ((isiOS || isSafari) && video.canPlayType('video/mp4; codecs="hvc1"')) {
+          return 'v1-alpha.mp4';
+        }
+        if (video.canPlayType('video/webm; codecs="vp8"')) {
+          return 'v1.webm';
+        }
+        return 'v1.mp4';
+      }
+
+      video.src = pickEnvelopeSrc();
 
       function loadImage(img) {
         if (!img) return Promise.resolve();
@@ -815,13 +851,52 @@
 
     (function () {
       const btn = document.getElementById('envelopeBtn');
+      const media = document.getElementById('envelopeMedia');
       const video = document.getElementById('envelopeVideo');
-      if (!btn || !video) return;
+      const canvas = document.getElementById('envelopeCanvas');
+      if (!btn || !video || !canvas || !media) return;
 
+      const ua = navigator.userAgent || '';
+      const isiOS = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const useCanvas = isiOS;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const ctx = canvas.getContext('2d', { alpha: true });
       let opened = false;
+      let rafId = null;
+
+      if (useCanvas) btn.classList.add('use-canvas');
+
+      function drawFrame() {
+        if (!video.videoWidth || !video.videoHeight) return;
+        const width = Math.max(1, Math.round(media.clientWidth));
+        const height = Math.max(1, Math.round(width * (video.videoHeight / video.videoWidth)));
+        if (canvas.width !== width) canvas.width = width;
+        if (canvas.height !== height) canvas.height = height;
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(video, 0, 0, width, height);
+      }
+
+      function stopRenderLoop() {
+        if (!rafId) return;
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+
+      function startRenderLoop() {
+        if (!useCanvas) return;
+        stopRenderLoop();
+        function tick() {
+          drawFrame();
+          if (!video.paused && !video.ended) {
+            rafId = requestAnimationFrame(tick);
+          }
+        }
+        tick();
+      }
 
       function markOpen() {
+        if (useCanvas) drawFrame();
         btn.classList.remove('is-opening');
         btn.classList.add('is-open');
         btn.setAttribute('aria-expanded', 'true');
@@ -835,6 +910,8 @@
           video.currentTime = Math.max(0, video.duration - 0.04);
         }
         video.pause();
+        if (useCanvas) drawFrame();
+        stopRenderLoop();
       }
 
       function openEnvelope() {
@@ -858,6 +935,7 @@
         video.playsInline = true;
 
         const playAttempt = video.play();
+        if (useCanvas) startRenderLoop();
         if (playAttempt && playAttempt.catch) {
           playAttempt.catch(function () {
             freezeAtEnd();
@@ -869,6 +947,7 @@
       video.addEventListener('loadeddata', function () {
         video.pause();
         video.currentTime = 0;
+        if (useCanvas) drawFrame();
       });
 
       video.addEventListener('ended', function () {
