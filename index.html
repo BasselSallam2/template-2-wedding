@@ -293,6 +293,16 @@
       transition: opacity 0.35s var(--ease);
     }
 
+    body.ios-video-fix .envelope-media {
+      isolation: isolate;
+    }
+
+    body.ios-video-fix .envelope.is-opening .envelope-video,
+    body.ios-video-fix .envelope.is-open .envelope-video {
+      /* iOS Safari shows VP8 matte as black; screen blend removes it */
+      mix-blend-mode: screen;
+    }
+
     .envelope.is-opening .envelope-poster,
     .envelope.is-open .envelope-poster {
       position: absolute;
@@ -675,6 +685,12 @@
       const body = document.body;
       const poster = document.querySelector('.envelope-poster');
       const video = document.getElementById('envelopeVideo');
+      const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      if (isiOS) {
+        body.classList.add('ios-video-fix');
+      }
 
       function loadImage(img) {
         if (!img) return Promise.resolve();
