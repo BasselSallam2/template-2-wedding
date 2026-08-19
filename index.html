@@ -264,6 +264,7 @@
       position: relative;
       width: var(--video-width);
       line-height: 0;
+      background: var(--warm-white);
     }
 
     .envelope-poster,
@@ -271,6 +272,7 @@
       display: block;
       width: 100%;
       height: auto;
+      background: var(--warm-white);
       user-select: none;
       -webkit-user-drag: none;
     }
@@ -289,31 +291,16 @@
       z-index: 1;
       opacity: 0;
       pointer-events: none;
-      background: transparent;
+      object-fit: contain;
+      object-position: center;
       transition: opacity 0.35s var(--ease);
     }
 
-    body.ios-video-fix .envelope-media {
-      isolation: isolate;
-    }
-
-    body.ios-video-fix .envelope-video {
-      /* clip video to the envelope alpha so VP8 black matte is hidden */
-      -webkit-mask-image: url("closed.png");
-      -webkit-mask-size: 100% 100%;
-      -webkit-mask-repeat: no-repeat;
-      -webkit-mask-position: center;
-      mask-image: url("closed.png");
-      mask-size: 100% 100%;
-      mask-repeat: no-repeat;
-      mask-position: center;
-      object-fit: fill;
-      background: transparent;
-    }
-
-    body.ios-video-fix .envelope.is-opening .envelope-video,
-    body.ios-video-fix .envelope.is-open .envelope-video {
-      mix-blend-mode: normal;
+    .envelope-video::-webkit-media-controls,
+    .envelope-video::-webkit-media-controls-start-playback-button,
+    .envelope-video::-webkit-media-controls-enclosure {
+      display: none !important;
+      -webkit-appearance: none;
     }
 
     .envelope.is-opening .envelope-poster,
@@ -617,7 +604,6 @@
               <video
                 id="envelopeVideo"
                 class="envelope-video"
-                src="v1.mp4"
                 playsinline
                 webkit-playsinline
                 x5-playsinline
@@ -626,7 +612,9 @@
                 disablepictureinpicture
                 disableremoteplayback
                 aria-label="ظرف الدعوة"
-              ></video>
+              >
+                <source src="v1.mp4" type="video/mp4">
+              </video>
             </div>
           </div>
         </div>
@@ -698,12 +686,6 @@
       const body = document.body;
       const poster = document.querySelector('.envelope-poster');
       const video = document.getElementById('envelopeVideo');
-      const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-      if (isiOS) {
-        body.classList.add('ios-video-fix');
-      }
 
       function loadImage(img) {
         if (!img) return Promise.resolve();
