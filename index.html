@@ -276,8 +276,9 @@
     .envelope-media {
       position: relative;
       width: var(--video-width);
-      min-height: calc(var(--video-width) * 439 / 568);
       line-height: 0;
+      overflow: hidden;
+      transition: height 0.45s var(--ease);
     }
 
     .envelope-poster,
@@ -285,6 +286,7 @@
       display: block;
       width: 100%;
       height: auto;
+      max-width: 100%;
       user-select: none;
       -webkit-user-drag: none;
     }
@@ -299,20 +301,22 @@
 
     .envelope-video {
       position: absolute;
-      inset: 0;
+      top: 0;
+      left: 0;
       z-index: 1;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      object-position: center bottom;
       opacity: 0;
       pointer-events: none;
+      background: transparent;
       filter: drop-shadow(0 22px 34px rgba(74, 55, 40, 0.14));
       transition: opacity 0.35s var(--ease);
+      -webkit-mask-image: none;
     }
 
     .envelope.is-opening .envelope-poster,
     .envelope.is-open .envelope-poster {
+      position: absolute;
+      top: 0;
+      left: 0;
       opacity: 0;
       transform: scale(0.98) translateY(6px);
       pointer-events: none;
@@ -320,6 +324,9 @@
 
     .envelope.is-opening .envelope-video,
     .envelope.is-open .envelope-video {
+      position: relative;
+      top: auto;
+      left: auto;
       opacity: 1;
     }
 
@@ -826,15 +833,26 @@
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       let opened = false;
 
-      function updateMediaHeight() {
-        if (!video.videoWidth || !video.videoHeight) return;
-        const posterRatio = 439 / 568;
-        const videoRatio = video.videoHeight / video.videoWidth;
-        const ratio = Math.max(posterRatio, videoRatio);
-        media.style.minHeight = 'calc(var(--video-width) * ' + ratio + ')';
+      function syncMediaHeight(useVideo) {
+        const width = media.getBoundingClientRect().width;
+        if (!width) return;
+
+        if (useVideo && video.videoWidth && video.videoHeight) {
+          media.style.height = (width * (video.videoHeight / video.videoWidth)) + 'px';
+          return;
+        }
+
+        const poster = media.querySelector('.envelope-poster');
+        if (poster && poster.naturalWidth && poster.naturalHeight) {
+          media.style.height = (width * (poster.naturalHeight / poster.naturalWidth)) + 'px';
+          return;
+        }
+
+        media.style.height = (width * (439 / 568)) + 'px';
       }
 
       function markOpen() {
+        syncMediaHeight(true);
         btn.classList.remove('is-opening');
         btn.classList.add('is-open');
         btn.setAttribute('aria-expanded', 'true');
@@ -853,6 +871,7 @@
       function openEnvelope() {
         if (opened) return;
         opened = true;
+        syncMediaHeight(true);
         btn.classList.add('is-opening');
         btn.setAttribute('aria-expanded', 'true');
 
@@ -861,6 +880,7 @@
             freezeAtEnd();
           } else {
             video.addEventListener('loadedmetadata', function () {
+              syncMediaHeight(true);
               freezeAtEnd();
             }, { once: true });
           }
@@ -881,18 +901,39 @@
         }
       }
 
-      video.addEventListener('loadedmetadata', updateMediaHeight);
+      video.addEventListener('loadedmetadata', function () {
+        if (btn.classList.contains('is-opening') || btn.classList.contains('is-open')) {
+          syncMediaHeight(true);
+        } else {
+          syncMediaHeight(false);
+        }
+      });
 
       video.addEventListener('loadeddata', function () {
         video.pause();
         video.currentTime = 0;
-        updateMediaHeight();
+        syncMediaHeight(false);
       });
 
       video.addEventListener('ended', function () {
         freezeAtEnd();
+        syncMediaHeight(true);
         markOpen();
       });
+
+      window.addEventListener('resize', function () {
+        if (btn.classList.contains('is-opening') || btn.classList.contains('is-open')) {
+          syncMediaHeight(true);
+        } else {
+          syncMediaHeight(false);
+        }
+      });
+
+      const poster = media.querySelector('.envelope-poster');
+      if (poster) {
+        if (poster.complete) syncMediaHeight(false);
+        else poster.addEventListener('load', function () { syncMediaHeight(false); }, { once: true });
+      }
 
       btn.addEventListener('pointerup', function (event) {
         if (event.pointerType === 'mouse' && event.button !== 0) return;
