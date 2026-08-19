@@ -241,19 +241,6 @@
       justify-content: center;
     }
 
-    .envelope-shadow {
-      position: absolute;
-      bottom: 2%;
-      left: 50%;
-      width: 58%;
-      height: 14%;
-      transform: translateX(-50%);
-      background: radial-gradient(ellipse, rgba(74, 55, 40, 0.2), transparent 72%);
-      filter: blur(10px);
-      pointer-events: none;
-      z-index: 0;
-    }
-
     .envelope-float {
       position: relative;
       z-index: 1;
@@ -277,17 +264,13 @@
       position: relative;
       width: var(--video-width);
       line-height: 0;
-      overflow: hidden;
-      transition: height 0.45s var(--ease);
     }
 
     .envelope-poster,
-    .envelope-video,
-    .envelope-canvas {
+    .envelope-video {
       display: block;
       width: 100%;
       height: auto;
-      max-width: 100%;
       user-select: none;
       -webkit-user-drag: none;
     }
@@ -296,15 +279,7 @@
       position: relative;
       z-index: 2;
       mix-blend-mode: screen;
-      filter: drop-shadow(0 22px 34px rgba(74, 55, 40, 0.14));
-      transition: opacity 0.35s var(--ease), transform 0.5s var(--ease-out);
-    }
-
-    .envelope-canvas {
-      display: none;
-      position: relative;
-      z-index: 3;
-      filter: drop-shadow(0 22px 34px rgba(74, 55, 40, 0.14));
+      transition: opacity 0.35s var(--ease);
     }
 
     .envelope-video {
@@ -315,7 +290,6 @@
       opacity: 0;
       pointer-events: none;
       background: transparent;
-      filter: drop-shadow(0 22px 34px rgba(74, 55, 40, 0.14));
       transition: opacity 0.35s var(--ease);
     }
 
@@ -324,34 +298,15 @@
       position: absolute;
       top: 0;
       left: 0;
+      width: 100%;
       opacity: 0;
-      transform: scale(0.98) translateY(6px);
       pointer-events: none;
     }
 
-    .envelope:not(.use-canvas).is-opening .envelope-video,
-    .envelope:not(.use-canvas).is-open .envelope-video {
+    .envelope.is-opening .envelope-video,
+    .envelope.is-open .envelope-video {
       position: relative;
-      top: auto;
-      left: auto;
       opacity: 1;
-      mix-blend-mode: screen;
-    }
-
-    .envelope.use-canvas.is-opening .envelope-canvas,
-    .envelope.use-canvas.is-open .envelope-canvas {
-      display: block;
-    }
-
-    .envelope.use-canvas.is-opening .envelope-video,
-    .envelope.use-canvas.is-open .envelope-video {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      opacity: 0.01;
-      z-index: 1;
     }
 
     .envelope.is-open:not(.is-opening) .envelope-video {
@@ -609,8 +564,7 @@
       .envelope.is-open .envelope-float,
       .envelope-hint { animation: none; }
       .envelope-poster,
-      .envelope-video,
-      .envelope-canvas { transition: none; }
+      .envelope-video { transition: none; }
     }
   </style>
 </head>
@@ -634,7 +588,6 @@
 
       <button type="button" class="envelope" id="envelopeBtn" aria-expanded="false" aria-label="افتح الدعوة">
         <div class="envelope-stage">
-          <div class="envelope-shadow" aria-hidden="true"></div>
           <div class="envelope-float" id="envelopeFloat">
             <div class="envelope-media" id="envelopeMedia">
               <img class="envelope-poster" src="closed.png" alt="ظرف مغلق" width="568" height="439" draggable="false" decoding="sync" fetchpriority="high">
@@ -651,7 +604,6 @@
                 disableremoteplayback
                 aria-label="ظرف الدعوة"
               ></video>
-              <canvas id="envelopeCanvas" class="envelope-canvas" aria-hidden="true"></canvas>
             </div>
           </div>
         </div>
@@ -852,115 +804,18 @@
 
     (function () {
       const btn = document.getElementById('envelopeBtn');
-      const media = document.getElementById('envelopeMedia');
       const video = document.getElementById('envelopeVideo');
-      const canvas = document.getElementById('envelopeCanvas');
-      if (!btn || !media || !video || !canvas) return;
+      if (!btn || !video) return;
 
-      const ctx = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
-      const useCanvas = window.matchMedia('(hover: none) and (pointer: coarse)').matches
-        || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       let opened = false;
-      let rafId = null;
-
-      if (useCanvas) btn.classList.add('use-canvas');
-
-      function keyFrame(imageData) {
-        const pixels = imageData.data;
-
-        for (let i = 0; i < pixels.length; i += 4) {
-          const r = pixels[i];
-          const g = pixels[i + 1];
-          const b = pixels[i + 2];
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const sat = max - min;
-
-          if (max <= 34) {
-            pixels[i + 3] = 0;
-            continue;
-          }
-
-          if (max <= 62 && sat < 20) {
-            pixels[i + 3] = Math.round(pixels[i + 3] * Math.max(0, (max - 34) / 28));
-            continue;
-          }
-
-          if (min >= 247 && sat < 14) {
-            pixels[i + 3] = Math.round(pixels[i + 3] * Math.max(0, (255 - min) / 8));
-          }
-        }
-      }
-
-      function drawFrame() {
-        if (!video.videoWidth || !video.videoHeight) return;
-
-        const width = Math.max(1, Math.round(media.clientWidth));
-        const height = Math.max(1, Math.round(width * (video.videoHeight / video.videoWidth)));
-
-        if (canvas.width !== width) canvas.width = width;
-        if (canvas.height !== height) canvas.height = height;
-
-        ctx.clearRect(0, 0, width, height);
-        ctx.drawImage(video, 0, 0, width, height);
-
-        const frame = ctx.getImageData(0, 0, width, height);
-        keyFrame(frame);
-        ctx.putImageData(frame, 0, 0);
-      }
-
-      function stopRenderLoop() {
-        if (!rafId) return;
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-
-      function startRenderLoop() {
-        if (!useCanvas) return;
-        stopRenderLoop();
-
-        function tick() {
-          drawFrame();
-          if (!video.paused && !video.ended) {
-            rafId = requestAnimationFrame(tick);
-          }
-        }
-
-        tick();
-      }
-
-      function syncMediaHeight(useVideo) {
-        const width = media.getBoundingClientRect().width;
-        if (!width) return;
-
-        if (useVideo && video.videoWidth && video.videoHeight) {
-          media.style.height = (width * (video.videoHeight / video.videoWidth)) + 'px';
-          return;
-        }
-
-        const poster = media.querySelector('.envelope-poster');
-        if (poster && poster.naturalWidth && poster.naturalHeight) {
-          media.style.height = (width * (poster.naturalHeight / poster.naturalWidth)) + 'px';
-          return;
-        }
-
-        media.style.height = (width * (439 / 568)) + 'px';
-      }
 
       function markOpen() {
-        syncMediaHeight(true);
-        if (useCanvas) drawFrame();
         btn.classList.remove('is-opening');
         btn.classList.add('is-open');
         btn.setAttribute('aria-expanded', 'true');
         btn.setAttribute('aria-label', 'الدعوة مفتوحة');
-        if (useCanvas) {
-          canvas.removeAttribute('aria-hidden');
-          canvas.setAttribute('aria-label', 'دعوة يوسف وحنين');
-        } else {
-          video.setAttribute('aria-label', 'دعوة يوسف وحنين');
-        }
+        video.setAttribute('aria-label', 'دعوة يوسف وحنين');
         window.dispatchEvent(new CustomEvent('envelope:opened'));
       }
 
@@ -969,25 +824,19 @@
           video.currentTime = Math.max(0, video.duration - 0.04);
         }
         video.pause();
-        if (useCanvas) drawFrame();
       }
 
       function openEnvelope() {
         if (opened) return;
         opened = true;
-        syncMediaHeight(true);
         btn.classList.add('is-opening');
         btn.setAttribute('aria-expanded', 'true');
-        canvas.removeAttribute('aria-hidden');
 
         if (reducedMotion) {
           if (video.readyState >= 1) {
             freezeAtEnd();
           } else {
-            video.addEventListener('loadedmetadata', function () {
-              syncMediaHeight(true);
-              freezeAtEnd();
-            }, { once: true });
+            video.addEventListener('loadedmetadata', freezeAtEnd, { once: true });
           }
           markOpen();
           return;
@@ -996,7 +845,6 @@
         video.currentTime = 0;
         video.muted = true;
         video.playsInline = true;
-        if (useCanvas) drawFrame();
 
         const playAttempt = video.play();
         if (playAttempt && playAttempt.catch) {
@@ -1007,46 +855,15 @@
         }
       }
 
-      video.addEventListener('loadedmetadata', function () {
-        if (btn.classList.contains('is-opening') || btn.classList.contains('is-open')) {
-          syncMediaHeight(true);
-        } else {
-          syncMediaHeight(false);
-        }
-      });
-
       video.addEventListener('loadeddata', function () {
         video.pause();
         video.currentTime = 0;
-        syncMediaHeight(false);
-      });
-
-      video.addEventListener('play', startRenderLoop);
-      video.addEventListener('seeked', function () {
-        if (useCanvas) drawFrame();
       });
 
       video.addEventListener('ended', function () {
-        stopRenderLoop();
         freezeAtEnd();
-        syncMediaHeight(true);
         markOpen();
       });
-
-      window.addEventListener('resize', function () {
-        if (btn.classList.contains('is-opening') || btn.classList.contains('is-open')) {
-          syncMediaHeight(true);
-          if (useCanvas) drawFrame();
-        } else {
-          syncMediaHeight(false);
-        }
-      });
-
-      const poster = media.querySelector('.envelope-poster');
-      if (poster) {
-        if (poster.complete) syncMediaHeight(false);
-        else poster.addEventListener('load', function () { syncMediaHeight(false); }, { once: true });
-      }
 
       btn.addEventListener('pointerup', function (event) {
         if (event.pointerType === 'mouse' && event.button !== 0) return;
