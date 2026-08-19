@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FAF8F4">
+  <title>Envelope Frame Test — يوسف &amp; حنين</title>
+
+  <link rel="preload" as="image" href="frame-1.png">
+  <link rel="preload" as="image" href="frame-2.png">
+  <link rel="preload" as="image" href="frame-3.png">
+  <link rel="preload" as="image" href="frame-4.png">
+  <link rel="preload" as="image" href="frame-5.png">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --warm-white: #FAF8F4;
+      --ivory: #FFFFF5;
+      --champagne: #F5EDE3;
+      --beige: #E8DFD4;
+      --olive: #4A3728;
+      --stone: #7A7068;
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --frame-width: min(82vw, 340px);
+      --frame-max-height: calc(var(--frame-width) * 180 / 157);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "DM Sans", sans-serif;
+      color: var(--olive);
+      min-height: 100dvh;
+      overflow-x: hidden;
+      background: var(--warm-white);
+    }
+
+    .silk {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(118deg, transparent 38%, rgba(255,255,255,0.55) 44%, transparent 50%),
+        linear-gradient(242deg, transparent 32%, rgba(255,255,255,0.35) 40%, transparent 46%),
+        linear-gradient(168deg, transparent 55%, rgba(232,223,212,0.45) 62%, transparent 68%),
+        radial-gradient(ellipse 90% 70% at 18% 12%, rgba(255,255,255,0.65), transparent 58%),
+        radial-gradient(ellipse 80% 60% at 82% 88%, rgba(245,237,227,0.7), transparent 55%),
+        linear-gradient(175deg, var(--ivory) 0%, var(--champagne) 42%, var(--beige) 100%);
+    }
+
+    .hero {
+      position: relative;
+      z-index: 2;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem 3rem;
+      text-align: center;
+    }
+
+    .hero-inner {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .test-badge {
+      display: inline-block;
+      margin-bottom: 1.25rem;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid rgba(196,181,165,0.55);
+      border-radius: 999px;
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--stone);
+      background: rgba(255,255,245,0.7);
+    }
+
+    .envelope {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .envelope.is-open,
+    .envelope.is-opening {
+      cursor: default;
+    }
+
+    .envelope-stage {
+      position: relative;
+      width: var(--frame-width);
+      height: var(--frame-max-height);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .envelope-glow {
+      position: absolute;
+      inset: 8% 4% 0;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(196,181,165,0.35), transparent 68%);
+      opacity: 0;
+      transform: scale(0.92);
+      transition: opacity 0.45s var(--ease), transform 0.8s var(--ease-out);
+      pointer-events: none;
+    }
+
+    .envelope.is-opening .envelope-glow {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+
+    .envelope.is-open .envelope-glow {
+      opacity: 0.45;
+      transform: scale(1);
+    }
+
+    .envelope-float {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      animation: envelope-float 3.4s ease-in-out infinite;
+      will-change: transform;
+      transition: transform 0.55s var(--ease-out);
+    }
+
+    .envelope.is-opening .envelope-float,
+    .envelope.is-open .envelope-float {
+      animation: none;
+    }
+
+    .envelope-frames {
+      position: relative;
+      width: var(--frame-width);
+      height: var(--frame-max-height);
+    }
+
+    .envelope-frame {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: var(--frame-width);
+      height: auto;
+      opacity: 0;
+      transform: translateX(-50%);
+      transition: opacity 0.14s linear;
+      mix-blend-mode: screen;
+      filter: drop-shadow(0 16px 24px rgba(74, 55, 40, 0.16));
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+    }
+
+    .envelope-frame.is-active {
+      opacity: 1;
+      z-index: 2;
+    }
+
+    .envelope-frame.is-leaving {
+      opacity: 0;
+      z-index: 1;
+    }
+
+    .envelope-shimmer {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0;
+      background: linear-gradient(
+        115deg,
+        transparent 35%,
+        rgba(255,255,255,0.55) 50%,
+        transparent 65%
+      );
+      transform: translateX(-120%);
+    }
+
+    .envelope.is-opening .envelope-shimmer {
+      animation: envelope-shimmer 0.85s var(--ease-out) forwards;
+    }
+
+    .envelope:not(.is-open):not(.is-opening):hover .envelope-float {
+      animation-play-state: paused;
+      transform: translateY(-5px) scale(1.015);
+    }
+
+    .envelope:not(.is-open):not(.is-opening):active .envelope-float {
+      transform: translateY(3px) scale(0.985);
+    }
+
+    .envelope.is-open .envelope-float {
+      animation: envelope-float-open 4s ease-in-out infinite;
+    }
+
+    .envelope-hint {
+      display: block;
+      margin-top: 1.35rem;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--stone);
+      animation: gentle-bob 2.8s ease-in-out infinite;
+      transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
+    }
+
+    .envelope.is-opening .envelope-hint,
+    .envelope.is-open .envelope-hint {
+      opacity: 0;
+      transform: translateY(8px);
+      animation: none;
+    }
+
+    .frame-indicator {
+      margin-top: 1rem;
+      font-size: 0.62rem;
+      letter-spacing: 0.12em;
+      color: rgba(122, 112, 104, 0.75);
+      direction: ltr;
+    }
+
+    @keyframes envelope-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-14px); }
+    }
+
+    @keyframes envelope-float-open {
+      0%, 100% { transform: translateY(-16px) scale(1.034); }
+      50% { transform: translateY(-24px) scale(1.034); }
+    }
+
+    @keyframes gentle-bob {
+      0%, 100% { transform: translateY(0); opacity: 0.7; }
+      50% { transform: translateY(4px); opacity: 1; }
+    }
+
+    @keyframes envelope-shimmer {
+      0% { opacity: 0; transform: translateX(-120%); }
+      20% { opacity: 0.7; }
+      100% { opacity: 0; transform: translateX(120%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .envelope-float,
+      .envelope.is-open .envelope-float,
+      .envelope-hint,
+      .envelope-shimmer { animation: none; }
+      .envelope-frame { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="silk" aria-hidden="true"></div>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="test-badge">5-frame animation test</span>
+
+      <button type="button" class="envelope" id="envelopeBtn" aria-expanded="false" aria-label="افتح الدعوة">
+        <div class="envelope-stage">
+          <div class="envelope-glow" aria-hidden="true"></div>
+          <div class="envelope-float" id="envelopeFloat">
+            <div class="envelope-frames" id="envelopeFrames">
+              <img class="envelope-frame is-active" data-frame="1" src="frame-1.png" alt="ظرف مغلق" width="157" height="118" draggable="false">
+              <img class="envelope-frame" data-frame="2" src="frame-2.png" alt="" width="157" height="118" draggable="false" aria-hidden="true">
+              <img class="envelope-frame" data-frame="3" src="frame-3.png" alt="" width="157" height="180" draggable="false" aria-hidden="true">
+              <img class="envelope-frame" data-frame="4" src="frame-4.png" alt="" width="157" height="180" draggable="false" aria-hidden="true">
+              <img class="envelope-frame" data-frame="5" src="frame-5.png" alt="" width="157" height="180" draggable="false" aria-hidden="true">
+            </div>
+            <div class="envelope-shimmer" aria-hidden="true"></div>
+          </div>
+        </div>
+        <span class="envelope-hint">اضغط لفتح الدعوة</span>
+      </button>
+
+      <p class="frame-indicator" id="frameIndicator">Frame 1 / 5</p>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      const btn = document.getElementById('envelopeBtn');
+      const float = document.getElementById('envelopeFloat');
+      const indicator = document.getElementById('frameIndicator');
+      const frames = Array.from(document.querySelectorAll('.envelope-frame'));
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const STEP_MS = reducedMotion
+        ? [0, 0, 0, 0]
+        : [130, 155, 175, 210];
+
+      const MOTION = [
+        { y: 0, scale: 1 },
+        { y: -3, scale: 1.008 },
+        { y: -8, scale: 1.018 },
+        { y: -12, scale: 1.028 },
+        { y: -16, scale: 1.034 }
+      ];
+
+      let opened = false;
+      let activeIndex = 0;
+
+      frames.slice(1).forEach(function (img) {
+        new Image().src = img.src;
+      });
+
+      function wait(ms) {
+        return new Promise(function (resolve) {
+          setTimeout(resolve, ms);
+        });
+      }
+
+      function setMotion(index) {
+        const motion = MOTION[index] || MOTION[MOTION.length - 1];
+        float.style.transform = 'translateY(' + motion.y + 'px) scale(' + motion.scale + ')';
+      }
+
+      function showFrame(index) {
+        frames.forEach(function (frame, i) {
+          frame.classList.remove('is-active', 'is-leaving');
+          frame.toggleAttribute('aria-hidden', i !== index);
+          if (i === index) {
+            frame.classList.add('is-active');
+          } else if (i === activeIndex) {
+            frame.classList.add('is-leaving');
+          }
+        });
+
+        activeIndex = index;
+        if (indicator) {
+          indicator.textContent = 'Frame ' + (index + 1) + ' / 5';
+        }
+        setMotion(index);
+      }
+
+      async function playOpening() {
+        btn.classList.add('is-opening');
+        btn.setAttribute('aria-expanded', 'true');
+        setMotion(0);
+        float.style.transform = 'translateY(2px) scale(0.985)';
+        await wait(reducedMotion ? 0 : 90);
+
+        for (let step = 1; step < frames.length; step += 1) {
+          showFrame(step);
+          await wait(STEP_MS[step - 1]);
+        }
+
+        btn.classList.remove('is-opening');
+        btn.classList.add('is-open');
+        btn.setAttribute('aria-label', 'الدعوة مفتوحة');
+        frames[frames.length - 1].alt = 'دعوة يوسف وحنين';
+        float.style.transform = '';
+      }
+
+      btn.addEventListener('click', function () {
+        if (opened) return;
+        opened = true;
+        playOpening();
+      });
+    })();
+  </script>
+</body>
+</html>
