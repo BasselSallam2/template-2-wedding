@@ -297,10 +297,23 @@
       isolation: isolate;
     }
 
+    body.ios-video-fix .envelope-video {
+      /* clip video to the envelope alpha so VP8 black matte is hidden */
+      -webkit-mask-image: url("closed.png");
+      -webkit-mask-size: 100% 100%;
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-image: url("closed.png");
+      mask-size: 100% 100%;
+      mask-repeat: no-repeat;
+      mask-position: center;
+      object-fit: fill;
+      background: transparent;
+    }
+
     body.ios-video-fix .envelope.is-opening .envelope-video,
     body.ios-video-fix .envelope.is-open .envelope-video {
-      /* iOS Safari shows VP8 matte as black; screen blend removes it */
-      mix-blend-mode: screen;
+      mix-blend-mode: normal;
     }
 
     .envelope.is-opening .envelope-poster,
